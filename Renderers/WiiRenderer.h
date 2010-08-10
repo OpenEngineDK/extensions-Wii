@@ -12,6 +12,10 @@
 
 #include <Renderers/IRenderer.h>
 
+// ogc stuff
+#include <gccore.h>
+
+
 namespace OpenEngine {
 namespace Renderers {
 

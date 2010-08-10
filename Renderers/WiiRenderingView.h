@@ -12,6 +12,7 @@
 
 #include <Renderers/IRenderingView.h>
 #include <Math/Matrix.h>
+#include <Scene/TransformationNode.h>
 
 #include <stack>
 
@@ -29,6 +30,7 @@ class WiiRenderingView
     : public IRenderingView {    
 private:
     stack<Matrix<4,4,float> > mv;
+    TransformationNode rt;
     inline void ApplyModelViewMatrix(Matrix<4,4,float> m);
 protected:
     // save the event arg 

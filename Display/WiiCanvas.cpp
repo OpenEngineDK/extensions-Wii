@@ -29,7 +29,11 @@ WiiCanvas::~WiiCanvas() {
 
 void WiiCanvas::Handle(Display::InitializeEventArg arg) {
     if (init) return;
-    ((IListener<Renderers::InitializeEventArg>*)renderer)->Handle(Renderers::InitializeEventArg(*this));
+    width = arg.canvas.GetWidth();
+    height = arg.canvas.GetHeight();
+    
+    if (renderer)
+        ((IListener<Renderers::InitializeEventArg>*)renderer)->Handle(Renderers::InitializeEventArg(*this));
     init = true;
 }
 

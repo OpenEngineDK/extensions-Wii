@@ -12,13 +12,7 @@
 #include <Core/Exceptions.h>
 #include <Display/IViewingVolume.h>
 
-// ogc stuff
-#include <gccore.h>
-#include <malloc.h>
-#include <string.h>
-
-
-#define DEFAULT_FIFO_SIZE	(256*1024)
+#include <Logging/Logger.h>
 
 namespace OpenEngine {
 namespace Renderers {
@@ -36,58 +30,37 @@ WiiRenderer::~WiiRenderer() {
 
 void WiiRenderer::Handle(Renderers::InitializeEventArg arg) {
     if (init) return;
-	// setup the fifo and then init the flipper
-	void *gp_fifo = NULL;
-	gp_fifo = memalign(32,DEFAULT_FIFO_SIZE);
-	memset(gp_fifo,0,DEFAULT_FIFO_SIZE);
-	GX_Init(gp_fifo,DEFAULT_FIFO_SIZE);
-    //logger.info << "INITIALIZE RENDERER" << logger.end;
-
-
+    logger.info << "INITIALIZE RENDERER" << logger.end;
+    bgColor = Vector<4,float>(0.0,0.0,0.0,1.0);
+	GX_SetCullMode(GX_CULL_NONE);
     init = true;
 }
 
 void WiiRenderer::Handle(Renderers::ProcessEventArg arg) {
-    // @todo: assert we are in preprocess stage
-
-    GXColor bg = {bgColor[3] * 0xff, bgColor[2] * 0xff, bgColor[1] * 0xff, bgColor[0] * 0xff};
-	// clears the bg to color and clears the z buffer
+	// clears the bgColor and the z buffer
+    GXColor bg = {bgColor[0] * 0xff, bgColor[1] * 0xff, bgColor[2] * 0xff, bgColor[3] * 0xff};
 	GX_SetCopyClear(bg, 0x00ffffff);
-
-    GXRModeObj *rmode = VIDEO_GetPreferredMode(NULL);
-
-    // setup viewport near = 0 far = 1
-    u16 width = rmode->fbWidth;
-    u16 height = rmode->xfbHeight;
-
-    // setup copy environment from efb to xfb. 
-    // frame buffer size often varies from screen resolution
-    // so filtering and scaling must be applied.
-	float yscale = GX_GetYScaleFactor(width, height);
-	unsigned int lines = GX_SetDispCopyYScale(yscale);
-	GX_SetDispCopySrc(0, 0, width, height);
-	GX_SetDispCopyDst(width, lines);
-    GX_SetCopyFilter(rmode->aa, rmode->sample_pattern, GX_TRUE, rmode->vfilter);
-	GX_SetFieldMode(rmode->field_rendering,((rmode->viHeight==2*rmode->xfbHeight)?GX_ENABLE:GX_DISABLE));
-	GX_SetCullMode(GX_CULL_NONE);
-	GX_SetDispCopyGamma(GX_GM_1_0);
+    unsigned int width = arg.canvas.GetWidth();
+    unsigned int height = arg.canvas.GetHeight();
+    // GXRModeObj* rmode;
+	// rmode = VIDEO_GetPreferredMode(NULL);
 
     IViewingVolume* volume = arg.canvas.GetViewingVolume();
     // If no viewing volume is set for the viewport ignore it.
     if (volume != NULL) {
         volume->SignalRendering(arg.approx);
-
-        // Setup view dimensions stuff
-        GX_SetViewport(0.0, 0.0, width, height, 0.0, 1.0);
-        GX_SetScissor(0, 0, width, height);
-
+		// do this before drawing
+		// GX_SetViewport(0,0,rmode->fbWidth,rmode->efbHeight,0,1);
+		GX_SetViewport(0,0,width,height,0,1);
+        GX_SetScissor(0,0,width,height);
         // apply the volume
         ApplyViewingVolume(*volume);
     }
-
+    
     // run the processing phases
     RenderingEventArg rarg(arg.canvas, *this, arg.start, arg.approx);
 
+    // bgColor += Vector<4,float>(0.01,0.001,0.0001,0.0);
     this->preProcess.Notify(rarg);
     this->stage = RENDERER_PROCESS;
     this->process.Notify(rarg);
@@ -118,14 +91,14 @@ IEvent<RenderingEventArg>& WiiRenderer::ProcessEvent() {
 IEvent<RenderingEventArg>& WiiRenderer::PostProcessEvent() {
     return postProcess;
 }
-
 IEvent<RenderingEventArg>& WiiRenderer::DeinitializeEvent() {
     return deinitialize;
 }
 
 void WiiRenderer::ApplyViewingVolume(IViewingVolume& volume) {
     Mtx44 m;
-    volume.GetProjectionMatrix().ToArray((float*)&m);
+    Matrix<4,4,float> proj = volume.GetProjectionMatrix();
+    proj.ToArray((float*)&m);
     GX_LoadProjectionMtx(m, GX_PERSPECTIVE);
 }
 

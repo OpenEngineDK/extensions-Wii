@@ -1,0 +1,28 @@
+INCLUDE(${OE_CURRENT_EXTENSION_DIR}/FindOgc.cmake)
+INCLUDE(${OE_CURRENT_EXTENSION_DIR}/FindWiiuse.cmake)
+INCLUDE(${OE_CURRENT_EXTENSION_DIR}/FindFat.cmake)
+INCLUDE(${OE_CURRENT_EXTENSION_DIR}/FindDb.cmake)
+
+IF (OGC_FOUND) 
+  INCLUDE_DIRECTORIES(${OGC_INCLUDE_DIR})
+ELSE (OGC_FOUND)
+  MESSAGE ("WARNING: Could not find ogc - depending targets will be disabled.")
+ENDIF (OGC_FOUND)
+
+IF (WIIUSE_FOUND) 
+  INCLUDE_DIRECTORIES(${WIIUSE_INCLUDE_DIR})
+ELSE (WIIUSE_FOUND)
+  MESSAGE ("WARNING: Could not find wiiuse - depending targets will be disabled.")
+ENDIF (WIIUSE_FOUND)
+
+IF (FAT_FOUND) 
+  INCLUDE_DIRECTORIES(${FAT_INCLUDE_DIR})
+ELSE (FAT_FOUND)
+  MESSAGE ("WARNING: Could not find fat - depending targets will be disabled.")
+ENDIF (FAT_FOUND)
+
+IF (DB_FOUND) 
+  INCLUDE_DIRECTORIES(${DB_INCLUDE_DIR})
+ELSE (DB_FOUND)
+  MESSAGE ("WARNING: Could not find remote debug utils - depending targets will be disabled.")
+ENDIF (DB_FOUND)

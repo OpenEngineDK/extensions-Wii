@@ -54,6 +54,7 @@ private:
     GXRModeObj* rmode;
     unsigned int fb;
     void* frameBuffer[2];
+
 public:
     /**
      * Default constructor.
