@@ -17,10 +17,14 @@
 #include <stack>
 
 namespace OpenEngine {
+    namespace Geometry {
+        class Material;
+    }
 namespace Renderers {
 
 using namespace Scene;
 using Math::Matrix;
+using Geometry::Material;
 using std::stack;
 
 /**
@@ -32,6 +36,7 @@ private:
     stack<Matrix<4,4,float> > mv;
     TransformationNode rt;
     inline void ApplyModelViewMatrix(Matrix<4,4,float> m);
+    inline void ApplyMaterial(Material* m);
 protected:
     // save the event arg 
     RenderingEventArg* arg;
@@ -39,14 +44,14 @@ public:
     WiiRenderingView();
     virtual ~WiiRenderingView();
     void VisitMeshNode(MeshNode* node);
-    void VisitGeometryNode(GeometryNode* node);
-    void VisitVertexArrayNode(VertexArrayNode* node);
+    // void VisitGeometryNode(GeometryNode* node);
+    // void VisitVertexArrayNode(VertexArrayNode* node);
     void VisitTransformationNode(TransformationNode* node);
     void VisitRenderStateNode(RenderStateNode* node);
     void VisitRenderNode(RenderNode* node);
-    // void VisitDisplayListNode(DisplayListNode* node);
-    void VisitBlendingNode(BlendingNode* node);
-    void VisitPostProcessNode(PostProcessNode* node);
+    // // void VisitDisplayListNode(DisplayListNode* node);
+    // void VisitBlendingNode(BlendingNode* node);
+    // void VisitPostProcessNode(PostProcessNode* node);
     void Handle(RenderingEventArg arg);
 };
 

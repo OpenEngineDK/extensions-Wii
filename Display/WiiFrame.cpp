@@ -117,11 +117,8 @@ void WiiFrame::Handle(Core::InitializeEventArg arg) {
 	frameBuffer[1] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
     //setup video
 	VIDEO_Configure(rmode);
-	VIDEO_SetNextFramebuffer(frameBuffer[fb]);
-	VIDEO_SetBlack(FALSE);
+	VIDEO_SetBlack(TRUE);
 	VIDEO_Flush();
-	VIDEO_WaitVSync();
-    if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
 
 	// setup the fifo and then init the flipper
 	void *gp_fifo = NULL;
@@ -147,30 +144,10 @@ void WiiFrame::Handle(Core::InitializeEventArg arg) {
 	GX_SetCopyClear(bg, 0x00ffffff);
     GX_CopyDisp(frameBuffer[fb],GX_TRUE);
 	VIDEO_SetBlack(FALSE);
+    VIDEO_SetNextFramebuffer(frameBuffer[fb]);
     VIDEO_Flush();
     VIDEO_WaitVSync();
-
-
-	// // setup the vertex descriptor
-	// // tells the flipper to expect direct data
-	// GX_ClearVtxDesc();
-	// GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
- 	// GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
- 
-	// // setup the vertex attribute table
-	// // describes the data
-	// // args: vat location 0-7, type of data, data format, size, scale
-	// // so for ex. in the first call we are sending position data with
-	// // 3 values X,Y,Z of size F32. scale sets the number of fractional
-	// // bits for non float data.
-	// GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
-	// GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGB8, 0);
- 
-	// GX_SetNumChans(1);
-	// GX_SetNumTexGens(0);
-	// GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORDNULL, GX_TEXMAP_NULL, GX_COLOR0A0);
-	// GX_SetTevOp(GX_TEVSTAGE0, GX_PASSCLR);
-
+    if(!(rmode->viTVMode&VI_NON_INTERLACE)) VIDEO_WaitVSync();
     init = true;
     ((IListener<Display::InitializeEventArg>*)canvas)->Handle(Display::InitializeEventArg(fc));
 }
@@ -188,9 +165,9 @@ void WiiFrame::Handle(Core::ProcessEventArg arg) {
     fb ^= 1;		// flip framebuffer
     GX_CopyDisp(frameBuffer[fb],GX_TRUE);
     VIDEO_WaitVSync();
-    if(rmode->viTVMode&VI_NON_INTERLACE) VIDEO_WaitVSync();
     VIDEO_SetNextFramebuffer(frameBuffer[fb]);
     VIDEO_Flush();
+    if(!(rmode->viTVMode&VI_NON_INTERLACE)) VIDEO_WaitVSync();
 }
 
 void WiiFrame::Handle(Core::DeinitializeEventArg arg) {

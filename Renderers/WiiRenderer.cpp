@@ -7,12 +7,25 @@
 // See the GNU General Public License for more details (see LICENSE). 
 //--------------------------------------------------------------------
 
+
+#define FI_RGBA_RED    0
+#define FI_RGBA_GREEN  1
+#define FI_RGBA_BLUE   2
+#define FI_RGBA_ALPHA  3
+
+#define _SHIFTL(v,s,w)							((unsigned int)(((unsigned int)(v)&((0x01<<(w))-1))<<(s)))
+#define _SHIFTR(v,s,w)							((unsigned int)(((unsigned int)(v)>>(s))&((0x01<<(w))-1)))
+
 #include <Renderers/WiiRenderer.h>
 
 #include <Core/Exceptions.h>
 #include <Display/IViewingVolume.h>
 
 #include <Logging/Logger.h>
+
+#include <malloc.h>
+#include <string.h>
+#include <ogc/machine/asm.h>
 
 namespace OpenEngine {
 namespace Renderers {
@@ -31,8 +44,13 @@ WiiRenderer::~WiiRenderer() {
 void WiiRenderer::Handle(Renderers::InitializeEventArg arg) {
     if (init) return;
     logger.info << "INITIALIZE RENDERER" << logger.end;
-    bgColor = Vector<4,float>(0.0,0.0,0.0,1.0);
-	GX_SetCullMode(GX_CULL_NONE);
+    // bgColor = Vector<4,float>(0.0,0.0,0.0,1.0);
+	GX_SetCullMode(GX_CULL_FRONT);
+    GX_InvVtxCache();
+	GX_InvalidateTexAll();
+    this->stage = RENDERER_INITIALIZE;
+    this->initialize.Notify(RenderingEventArg(arg.canvas, *this));
+    this->stage = RENDERER_PREPROCESS;
     init = true;
 }
 
@@ -49,10 +67,8 @@ void WiiRenderer::Handle(Renderers::ProcessEventArg arg) {
     // If no viewing volume is set for the viewport ignore it.
     if (volume != NULL) {
         volume->SignalRendering(arg.approx);
-		// do this before drawing
-		// GX_SetViewport(0,0,rmode->fbWidth,rmode->efbHeight,0,1);
-		GX_SetViewport(0,0,width,height,0,1);
-        GX_SetScissor(0,0,width,height);
+		GX_SetViewport(0, 0, width, height, 0,1);
+        GX_SetScissor(0, 0, width, height);
         // apply the volume
         ApplyViewingVolume(*volume);
     }
@@ -60,7 +76,6 @@ void WiiRenderer::Handle(Renderers::ProcessEventArg arg) {
     // run the processing phases
     RenderingEventArg rarg(arg.canvas, *this, arg.start, arg.approx);
 
-    // bgColor += Vector<4,float>(0.01,0.001,0.0001,0.0);
     this->preProcess.Notify(rarg);
     this->stage = RENDERER_PROCESS;
     this->process.Notify(rarg);
@@ -115,12 +130,95 @@ void WiiRenderer::LoadTexture(ITexture2DPtr texr) {
 }
 
 void WiiRenderer::LoadTexture(ITexture2D* texr) {
+    logger.info << "loadtex" << logger.end;
     if (texr == NULL) return;
 
     // check if textures has already been bound.
     if (texr->GetID() != 0) return;
 
     //@todo load the damn texture (whatever that means)
+    bool loaded = true;
+    if (texr->GetVoidDataPtr() == NULL){
+        loaded = false;
+        texr->Load(); //@todo: what the #@!%?
+    }
+
+    if ((texr->GetColorFormat() != RGBA) && (texr->GetColorFormat() != RGB)) {
+        logger.error << "unsupported texture color format" << logger.end;
+        throw Exception("hest");
+    }
+
+    unsigned int xres = texr->GetWidth();
+    unsigned int yres = texr->GetHeight();
+
+    // unsigned int xres = 128;
+    // unsigned int yres = 128;
+
+    unsigned int sz = xres * yres * 4;//sizeof(u16);
+
+    u16* d = (u16*)memalign(PPC_CACHE_ALIGNMENT,sz);
+    u8* bits = (u8*)texr->GetVoidDataPtr();
+    u16 color;
+    unsigned int x, y, ix, iy;
+    unsigned int pos = 0;
+    unsigned int chans = texr->GetChannels();
+
+    
+    // for(y=0;y<yres;y+=4) {
+    //     for(x=0;x<xres;x+=4) {
+    //         for(iy=0;iy<4;++iy) {
+    //             for(ix=0;ix<4;++ix) {
+                    
+    //                 color = 0xFFFF;
+    //                 //(unsigned short)(_SHIFTL((bits[(((y+iy)*(xres<<2))+((x+ix)<<2))+FI_RGBA_RED]>>3),11,5))|(_SHIFTL((bits[(((y+iy)*(xres<<2))+((x+ix)<<2))+FI_RGBA_GREEN]>>2),5,6))|(_SHIFTL((bits[(((y+iy)*(xres<<2))+((x+ix)<<2))+FI_RGBA_BLUE]>>3),0,5));
+    //                 d[pos] = color;
+    //                 ++pos;
+
+    //             }
+    //         }
+    //     }
+    // }
+
+
+    for(y=0;y<yres;y+=4) {
+        for(x=0;x<xres;x+=4) {
+            for(iy=0;iy<4;++iy) {
+                for(ix=0;ix<4;++ix) {
+                    color = (bits[(((y+iy)*(xres*chans))+((x+ix)*chans))+FI_RGBA_RED]&0xff);
+                    if (chans == 3)
+                        color |= _SHIFTL(0xFF,8,8);
+                    else 
+                        color |= _SHIFTL(bits[(((y+iy)*(xres*chans))+((x+ix)*chans))+FI_RGBA_ALPHA],8,8);
+                    d[pos++] = color;
+                }
+            }
+            for(iy=0;iy<4;++iy) {
+                for(ix=0;ix<4;++ix) {
+                    color = _SHIFTL(bits[(((y+iy)*(xres*chans))+((x+ix)*chans))+FI_RGBA_GREEN],8,8)|(bits[(((y+iy)*(xres*chans))+((x+ix)*chans))+FI_RGBA_BLUE]&0xff);
+                    d[pos++] = color;
+                }
+            }
+        }
+    }
+
+    DCFlushRange(d,sz);
+	GXTexObj* tex = new GXTexObj();
+    GX_InitTexObj(tex,
+                  d,
+                  xres,
+                  yres,
+                  GX_TF_RGBA8,
+                  GX_CLAMP,
+                  GX_CLAMP,
+                  GX_FALSE
+                  );
+
+    texr->SetID((unsigned int)tex);
+    // logger.info << "setid: " << texr->GetID() << logger.end;
+    // logger.info << "xres: " << xres << " yres: " << yres << logger.end;
+    // Return the texture in the state we got it.
+    if (!loaded)
+        texr->Unload();
 }
 
 void WiiRenderer::LoadTexture(ITexture3DPtr texr) {
@@ -170,6 +268,10 @@ void WiiRenderer::BindFrameBuffer(FrameBuffer* fb){
 
 void WiiRenderer::BindDataBlock(IDataBlock* bo){
     throw NotImplemented("BindDataBlock() not supported.");
+}
+
+void WiiRenderer::RebindDataBlock(IDataBlockPtr ptr, unsigned int start, unsigned int end) {
+    throw NotImplemented("RebindDataBlock() not supported.");
 }
 
 void WiiRenderer::DrawFace(FacePtr f) {

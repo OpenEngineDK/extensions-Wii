@@ -9,8 +9,14 @@ ADD_LIBRARY(Extensions_Wii
   Renderers/WiiRenderer.cpp
   Renderers/WiiRenderingView.h
   Renderers/WiiRenderingView.cpp
+  Renderers/WiiLightVisitor.h
+  Renderers/WiiLightVisitor.cpp
   Logging/WiiLogger.h
   Logging/WiiLogger.cpp
+  Devices/WiiMote.h
+  Devices/WiiMote.cpp
+  Devices/WiiMoteManager.h
+  Devices/WiiMoteManager.cpp
 )
 
 TARGET_LINK_LIBRARIES(Extensions_Wii
